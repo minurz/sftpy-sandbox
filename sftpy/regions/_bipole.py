@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.stats import norm
+from scipy.special import ndtr
 
 from ..activity import Activity, ScheduledActivity
 from ..sim import Data, rng, Timeline
@@ -7,6 +7,7 @@ from ..sim.constants import BINFLUX, STAR_RADIUS
 from ..util import schrijver_rv
 
 from .constants import AR_BFIELD, BP_AH_TILT_WIDTH, BP_FLUX_POWER_ACT, BP_FLUX_POWER_EPH
+from .constants import ASYM_FLUX_FOLD, ASYM_SCATTER, AH_ASYM_DAMPING
 from .constants import BP_FRACTION_ANTI_HALE, ASYM_RATIO
 from .constants import BP_LAT_WIDTH, BP_LAT_FLUX_FOLD
 from .constants import BP_JOY_SLOPE, BP_TILT_WIDTH, BP_TILT_FLUX_FOLD, BP_TILT_CONST
@@ -38,7 +39,10 @@ class SchrijverBipole(MagneticRegion):
                  f_ah: float = BP_FRACTION_ANTI_HALE,
                  ah_tilt_width: float = BP_AH_TILT_WIDTH,
                  asym_ratio: float = ASYM_RATIO,
-                 flag_noise: bool = BP_FLAG_NOISE,):
+                 asym_scatter: float = ASYM_SCATTER,
+                 asym_flux_fold: float = ASYM_FLUX_FOLD,
+                 ah_asym_damping: float = AH_ASYM_DAMPING,
+                 flag_noise: bool = BP_FLAG_NOISE):
 
         super().__init__(time, data, activity)
 
@@ -60,6 +64,10 @@ class SchrijverBipole(MagneticRegion):
         self._tilt_width = tilt_width
         self._tilt_flux_fold = tilt_flux_fold
         self._tilt_const = tilt_const
+
+        self._asym_scatter = asym_scatter
+        self._asym_flux_fold = asym_flux_fold
+        self._ah_asym_damping = ah_asym_damping
 
         self._flag_noise = flag_noise
 
@@ -155,7 +163,7 @@ class SchrijverBipole(MagneticRegion):
         # existing hemi / strength flips follow unchanged
 
         # NEW: target anti-Hale fraction f_ah for regions whose Gaussian tail can't supply it
-        tail = norm.sf((90 - tilt_mean) / width) + norm.cdf((-90 - tilt_mean) / width)
+        tail = ndtr((tilt_mean - 90) / width) + ndtr((-90 - tilt_mean) / width)
         p_extra = np.clip((self._f_ah - tail) / (1 - tail), 0, 1)
         flip = rng.uniform(size=nnew) < p_extra
         # broad tilts with a weak preference for 180° from Joy
@@ -197,6 +205,7 @@ class SchrijverBipole(MagneticRegion):
         aflux = np.abs(flux)
         g = 1.0 - np.exp(-aflux * BINFLUX / self._asym_flux_fold)      # or: self._tilt_const / width
         ln_q = g * (np.log(self._asym_q) + self._asym_scatter * rng.normal(size=nnew))
+        ln_q[flip] *= self._ah_asym_damping # apply asym damping to anti-Hale regions
         kappa = np.repeat(ln_q * -np.cos(orient), nadd)                # signed prograde projection of the + pole
         t = np.tanh(0.5 * kappa)
         r_plus = r_nadd * (1.0 + t)
@@ -297,11 +306,15 @@ class SchrijverEphemeral(SchrijverBipole):
                  f_ah: float = BP_FRACTION_ANTI_HALE,
                  ah_tilt_width: float = BP_AH_TILT_WIDTH,
                  asym_ratio: float = ASYM_RATIO,
+                 asym_scatter: float = ASYM_SCATTER,
+                 asym_flux_fold: float = ASYM_FLUX_FOLD,
+                 ah_asym_damping: float = AH_ASYM_DAMPING,
                  flag_noise: bool = BP_FLAG_NOISE):
 
         super().__init__(time, data, activity, pwr, flux_min, flux_max, ar_bfield,
                          lat_width, lat_flux_fold, joy_slope, tilt_width,
-                         tilt_flux_fold, tilt_const, f_ah, ah_tilt_width, asym_ratio, flag_noise)
+                         tilt_flux_fold, tilt_const, f_ah, ah_tilt_width, asym_ratio, 
+                         asym_scatter, asym_flux_fold, ah_asym_damping, flag_noise)
 
         self._fraction_trb = fraction_trb
 

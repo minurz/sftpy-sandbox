@@ -15,7 +15,7 @@ from ..sim.constants import STAR_RADIUS
 
 from .constants import NSKIP, COL_RADIUS
 
-
+TWO_PI = 2 * np.pi
 
 @nb.jit(cache=True)
 def collide2(phi: npt.NDArray[np.float64],
@@ -62,7 +62,7 @@ def collide2(phi: npt.NDArray[np.float64],
             # print(f"{lo = } {theta[lo] = :.3f}")
             lo = lo - skips
             if lo < 0:
-                thetalo += 2 * np.pi
+                thetalo += TWO_PI
                 lo += nflux
 
         if lo > i:
@@ -77,7 +77,7 @@ def collide2(phi: npt.NDArray[np.float64],
             # print(f"{hi = } {theta[hi] = :.3f}")
             hi = hi + skips
             if hi >= nflux:
-                thetahi -= 2 * np.pi
+                thetahi -= TWO_PI
                 hi -= nflux
 
         if hi < i:
@@ -91,9 +91,14 @@ def collide2(phi: npt.NDArray[np.float64],
         # identify indices of spots within critical angular distance in co-lat
         neighbors_theta = np.arange(lo, hi + 1, dtype=np.int64) % nflux
 
-        phi_diff = phi[i] - phi[neighbors_theta]
-        phi_dist = np.abs((phi_diff + np.pi) % (2 * np.pi) - np.pi) # wrap to [-pi, pi]
+        phi_dist = np.abs(phi[i] - phi[neighbors_theta])
+
         is_near_phi = phi_dist < lcrphi
+
+        # NEW: account for wraparound at phi = 0 / 2π
+        if phi[i] < lcrphi or phi[i] > TWO_PI - lcrphi:
+            is_near_phi |= phi_dist > TWO_PI - lcrphi
+
         neighbors_phi = neighbors_theta[is_near_phi]
 
         r_diff = r[i] - r[neighbors_phi]

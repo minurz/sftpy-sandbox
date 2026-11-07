@@ -4,8 +4,17 @@ AR_BFIELD = 180.0
 # anti-Hale fraction of active regions
 BP_FRACTION_ANTI_HALE: float = 0.05
 
-# asymmetry area ratio of leading to following pole spatial concentrations as taken from Ijima et al.
-ASYM_RATIO: float = 0.4
+# asymmetry area ratio of leading to following pole spatial concentrations (r_lead / r_follow)^2; bracket 0.6–0.93
+ASYM_RATIO: float = 0.8
+
+# degree of randomness in asymmetry ratio, σ of ln(r_lead / r_follow), intrinsic (Yamamoto 2012)
+ASYM_SCATTER: float = 0.12
+
+# Flux scale at which asymmetry becomes significant (1e18 Mx per polarity or 2e20 Mx total unsigned)
+ASYM_FLUX_FOLD: float = 100
+
+# damping factor for anti-Hale flips, 0.0–1.0, where 1.0 is no damping and 0.0 is complete damping
+AH_ASYM_DAMPING: float = 0.5
 
 # power law index of source spectrum for active regions
 BP_FLUX_POWER_ACT: float = 1.9
