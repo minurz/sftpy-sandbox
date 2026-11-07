@@ -9,7 +9,7 @@ if __name__ == "__main__":
 
     import glob
 
-    flist = glob.glob("./runs/nov06fivecycles/*.npy")
+    flist = glob.glob("./runs/nov06run01/*.npy")
     data = np.array([np.load(f) for f in sorted(flist)])
 
     dt = 86400 * 1 * 16

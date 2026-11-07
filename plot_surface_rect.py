@@ -86,7 +86,7 @@ norm = Normalize(vmin=-vlim, vmax=vlim, clip=True)
 # maps = np.load("./runs/aug28five/maps.npz")["maps"]
 
 import glob
-flist = glob.glob("./runs/nov05run01/*.npy")
+flist = glob.glob("./runs/nov06run01/*.npy")
 maps = np.array([np.load(f) for f in sorted(flist)])
 
 iframe = 0

@@ -1,13 +1,15 @@
 import numpy as np
+from scipy.stats import norm
 
 from ..activity import Activity, ScheduledActivity
 from ..sim import Data, rng, Timeline
 from ..sim.constants import BINFLUX, STAR_RADIUS
 from ..util import schrijver_rv
 
-from .constants import AR_BFIELD, BP_FLUX_POWER_ACT, BP_FLUX_POWER_EPH
+from .constants import AR_BFIELD, BP_AH_TILT_WIDTH, BP_FLUX_POWER_ACT, BP_FLUX_POWER_EPH
+from .constants import BP_FRACTION_ANTI_HALE, ASYM_RATIO
 from .constants import BP_LAT_WIDTH, BP_LAT_FLUX_FOLD
-from .constants import BP_TILT_MEAN, BP_TILT_WIDTH, BP_TILT_FLUX_FOLD, BP_TILT_CONST
+from .constants import BP_JOY_SLOPE, BP_TILT_WIDTH, BP_TILT_FLUX_FOLD, BP_TILT_CONST
 from .constants import BP_FLUX_MIN, BP_FLUX_MAX
 from .constants import BP_FRACTION_TURBULENT
 from .constants import BP_FLAG_NOISE
@@ -29,11 +31,14 @@ class SchrijverBipole(MagneticRegion):
                  ar_bfield: float = AR_BFIELD,
                  lat_width: float = BP_LAT_WIDTH,
                  lat_flux_fold: float = BP_LAT_FLUX_FOLD,
-                 tilt_mean: float = BP_TILT_MEAN,
+                 joy_slope: float = BP_JOY_SLOPE,
                  tilt_width: float = BP_TILT_WIDTH,
                  tilt_flux_fold: float = BP_TILT_FLUX_FOLD,
                  tilt_const: float = BP_TILT_CONST,
-                 flag_noise: bool = BP_FLAG_NOISE):
+                 f_ah: float = BP_FRACTION_ANTI_HALE,
+                 ah_tilt_width: float = BP_AH_TILT_WIDTH,
+                 asym_ratio: float = ASYM_RATIO,
+                 flag_noise: bool = BP_FLAG_NOISE,):
 
         super().__init__(time, data, activity)
 
@@ -42,10 +47,16 @@ class SchrijverBipole(MagneticRegion):
         self._flux_max = flux_max
         self._ar_bfield = ar_bfield
 
+        self._f_ah = f_ah
+        self._ah_tilt_width = ah_tilt_width
+
+        self._asym_q = np.sqrt(asym_ratio)
+        self._a_lead, self._a_follow = (2 * self._asym_q) / (1 + self._asym_q), 2 / (1 + self._asym_q) # leading polarity is more compact than following polarity
+
         self._lat_width = lat_width
         self._lat_flux_fold = lat_flux_fold
 
-        self._tilt_mean = tilt_mean
+        self._joy_slope = joy_slope
         self._tilt_width = tilt_width
         self._tilt_flux_fold = tilt_flux_fold
         self._tilt_const = tilt_const
@@ -137,7 +148,19 @@ class SchrijverBipole(MagneticRegion):
         aflux = np.abs(flux)
         width = self._tilt_width * np.exp(
             -BINFLUX * aflux / self._tilt_flux_fold) + self._tilt_const
-        orient = (rng.normal(size=nnew) * width + self._tilt_mean) * np.pi / 180
+        
+        lat_abs = np.degrees(np.abs(np.pi / 2 - theta))
+        tilt_mean = self._joy_slope * lat_abs  # self._joy_amp * np.sin(np.radians(lat_abs)) for true nonlinear relationship
+        orient = (rng.normal(size=nnew) * width + tilt_mean) * np.pi / 180
+        # existing hemi / strength flips follow unchanged
+
+        # NEW: target anti-Hale fraction f_ah for regions whose Gaussian tail can't supply it
+        tail = norm.sf((90 - tilt_mean) / width) + norm.cdf((-90 - tilt_mean) / width)
+        p_extra = np.clip((self._f_ah - tail) / (1 - tail), 0, 1)
+        flip = rng.uniform(size=nnew) < p_extra
+        # broad tilts with a weak preference for 180° from Joy
+        orient[flip] += np.pi + np.deg2rad(rng.normal(size=flip.sum()) * self._ah_tilt_width)
+
         # flip sign for opposite polarity regions in different hemispheres (Hale's Law)
         hemi = np.sign(np.pi / 2 - theta)
         orient = np.pi * (1 - hemi) / 2 + hemi * orient
@@ -171,12 +194,22 @@ class SchrijverBipole(MagneticRegion):
         percon_nadd = np.repeat(percon, nadd)
         percon_nadd[ind_rest] = rest[rest > 0]
 
+        aflux = np.abs(flux)
+        g = 1.0 - np.exp(-aflux * BINFLUX / self._asym_flux_fold)      # or: self._tilt_const / width
+        ln_q = g * (np.log(self._asym_q) + self._asym_scatter * rng.normal(size=nnew))
+        kappa = np.repeat(ln_q * -np.cos(orient), nadd)                # signed prograde projection of the + pole
+        t = np.tanh(0.5 * kappa)
+        r_plus = r_nadd * (1.0 + t)
+        r_minus = r_nadd * (1.0 - t)
+
         # one polarity
-        offset1 = rng.uniform(high=r_nadd)
+        # offset1 = rng.uniform(high=r_nadd)
+        offset1 = rng.uniform(high=r_plus)    # polarity at +sep
         angle1 = rng.uniform(high=2 * np.pi, size=nadd_tot)
 
         # opposite polarity
-        offset2 = rng.uniform(high=r_nadd)
+        # offset2 = rng.uniform(high=r_nadd)
+        offset2 = rng.uniform(high=r_minus)   # polarity at -sep
         angle2 = rng.uniform(high=2 * np.pi, size=nadd_tot)
 
         x_tmp = np.concatenate([
@@ -257,15 +290,18 @@ class SchrijverEphemeral(SchrijverBipole):
                  ar_bfield: float = AR_BFIELD,
                  lat_width: float = BP_LAT_WIDTH,
                  lat_flux_fold: float = BP_LAT_FLUX_FOLD,
-                 tilt_mean: float = BP_TILT_MEAN,
+                 joy_slope: float = BP_JOY_SLOPE,
                  tilt_width: float = BP_TILT_WIDTH,
                  tilt_flux_fold: float = BP_TILT_FLUX_FOLD,
                  tilt_const: float = BP_TILT_CONST,
+                 f_ah: float = BP_FRACTION_ANTI_HALE,
+                 ah_tilt_width: float = BP_AH_TILT_WIDTH,
+                 asym_ratio: float = ASYM_RATIO,
                  flag_noise: bool = BP_FLAG_NOISE):
 
         super().__init__(time, data, activity, pwr, flux_min, flux_max, ar_bfield,
-                         lat_width, lat_flux_fold, tilt_mean, tilt_width,
-                         tilt_flux_fold, tilt_const, flag_noise)
+                         lat_width, lat_flux_fold, joy_slope, tilt_width,
+                         tilt_flux_fold, tilt_const, f_ah, ah_tilt_width, asym_ratio, flag_noise)
 
         self._fraction_trb = fraction_trb
 

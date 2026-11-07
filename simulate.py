@@ -70,7 +70,7 @@ def setup_sim() -> Simulation:
     # TODO this setup will eventually have a graphical counterpart
     nstep: int = 40001
 
-    output_dir = "./runs/nov06test01/"
+    output_dir = "./runs/nov06run02/"
     # uconsts.SAVE_FREQ = 1 * dt
 
     # Primary simulation timeline

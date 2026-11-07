@@ -92,7 +92,7 @@ def collide2(phi: npt.NDArray[np.float64],
         neighbors_theta = np.arange(lo, hi + 1, dtype=np.int64) % nflux
 
         phi_diff = phi[i] - phi[neighbors_theta]
-        phi_dist = np.abs(phi_diff)
+        phi_dist = np.abs((phi_diff + np.pi) % (2 * np.pi) - np.pi) # wrap to [-pi, pi]
         is_near_phi = phi_dist < lcrphi
         neighbors_phi = neighbors_theta[is_near_phi]
 
