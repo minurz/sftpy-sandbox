@@ -54,9 +54,10 @@ class SchrijverBipole(MagneticRegion):
         self._f_ah = f_ah
         self._ah_tilt_width = ah_tilt_width
 
-        self._asym_q = np.sqrt(asym_ratio)
-        self._a_lead, self._a_follow = (2 * self._asym_q) / (1 + self._asym_q), 2 / (1 + self._asym_q) # leading polarity is more compact than following polarity
-
+        self._asym_ratio = asym_ratio
+        self._ln_q = 0.5 * np.log(asym_ratio)
+        self._asym_scatter = asym_scatter
+        
         self._lat_width = lat_width
         self._lat_flux_fold = lat_flux_fold
 
@@ -65,7 +66,6 @@ class SchrijverBipole(MagneticRegion):
         self._tilt_flux_fold = tilt_flux_fold
         self._tilt_const = tilt_const
 
-        self._asym_scatter = asym_scatter
         self._asym_flux_fold = asym_flux_fold
         self._ah_asym_damping = ah_asym_damping
 
@@ -158,16 +158,18 @@ class SchrijverBipole(MagneticRegion):
             -BINFLUX * aflux / self._tilt_flux_fold) + self._tilt_const
         
         lat_abs = np.degrees(np.abs(np.pi / 2 - theta))
-        tilt_mean = self._joy_slope * lat_abs  # self._joy_amp * np.sin(np.radians(lat_abs)) for true nonlinear relationship
+        tilt_mean = self._joy_slope * lat_abs  # self._joy_amp * np.sin(np.radians(lat_abs)) for true nonlinear relationship, 4.2 for original IDL behavior
         orient = (rng.normal(size=nnew) * width + tilt_mean) * np.pi / 180
-        # existing hemi / strength flips follow unchanged
 
-        # NEW: target anti-Hale fraction f_ah for regions whose Gaussian tail can't supply it
-        tail = ndtr((tilt_mean - 90) / width) + ndtr((-90 - tilt_mean) / width)
-        p_extra = np.clip((self._f_ah - tail) / (1 - tail), 0, 1)
-        flip = rng.uniform(size=nnew) < p_extra
-        # broad tilts with a weak preference for 180° from Joy
-        orient[flip] += np.pi + np.deg2rad(rng.normal(size=flip.sum()) * self._ah_tilt_width)
+        # NEW: flip polarity of some regions to meet anti-Hale fraction target
+        tail = ndtr((tilt_mean - 90) / width) + ndtr((-90 - tilt_mean) / width) # chance of being anti-Hale from Gaussian scatter
+        p_extra = np.clip((self._f_ah - tail) / (1 - tail), 0, 1) # additional chance of anti-Hale flip to meet target fraction
+        flip = (rng.uniform(size=nnew) < p_extra) & (np.cos(orient) > 0)
+        # broad tilts with a weak preference for 180° from Joy, flipped for leading end poleward
+        orient[flip] += np.pi + np.deg2rad(-2 * tilt_mean[flip] + 
+                                           rng.normal(size=flip.sum()) * 
+                                           self._ah_tilt_width)
+        is_ah = np.cos(orient) < 0 # mask including both natural and forced anti-Hale flips
 
         # flip sign for opposite polarity regions in different hemispheres (Hale's Law)
         hemi = np.sign(np.pi / 2 - theta)
@@ -180,6 +182,7 @@ class SchrijverBipole(MagneticRegion):
 
         # impose minimum separation of ~0.5 supergranulation of 18Mm
         sep = np.clip(r, a_min=9000 / STAR_RADIUS / 2, a_max=None)
+        # sep[flip & is_ah] *= 0.8 # reduce separation of anti-Hale flips, this increases first pass cancellations
 
         # number of new concentrations that contain 15e18 Mx w/ at least
         # three equal concentrations per polarity
@@ -202,14 +205,14 @@ class SchrijverBipole(MagneticRegion):
         percon_nadd = np.repeat(percon, nadd)
         percon_nadd[ind_rest] = rest[rest > 0]
 
-        aflux = np.abs(flux)
-        g = 1.0 - np.exp(-aflux * BINFLUX / self._asym_flux_fold)      # or: self._tilt_const / width
-        ln_q = g * (np.log(self._asym_q) + self._asym_scatter * rng.normal(size=nnew))
-        ln_q[flip] *= self._ah_asym_damping # apply asym damping to anti-Hale regions
-        kappa = np.repeat(ln_q * -np.cos(orient), nadd)                # signed prograde projection of the + pole
-        t = np.tanh(0.5 * kappa)
-        r_plus = r_nadd * (1.0 + t)
-        r_minus = r_nadd * (1.0 - t)
+        g = 1.0 - np.exp(-aflux * BINFLUX / self._asym_flux_fold) # low asymmetry at low flux
+        ln_q = g * (self._ln_q + self._asym_scatter * rng.normal(size=nnew))
+        ln_q[is_ah] *= self._ah_asym_damping # reduces asym for ALL aH regions, both from flip and natural chance
+
+        # t > 0 when ln_q > 0 and the + pole is prograde
+        t = np.repeat(np.tanh(-0.5 * ln_q * np.cos(orient)), nadd)
+        r_plus = r_nadd * (1 + t)
+        r_minus = r_nadd * (1 - t)
 
         # one polarity
         # offset1 = rng.uniform(high=r_nadd)
@@ -269,7 +272,7 @@ class SchrijverBipole(MagneticRegion):
             noise[ind_rest] = 0.0
 
             percon_nadd += noise
-            percon_nadd[ind_rest] -= noise[ind_rest]
+            percon_nadd[ind_rest] -= noise[ind_rest] # already 0?
 
         # add both polarities of spots
         aflux = np.concatenate([
