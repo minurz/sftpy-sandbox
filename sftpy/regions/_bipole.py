@@ -166,9 +166,7 @@ class SchrijverBipole(MagneticRegion):
         p_extra = np.clip((self._f_ah - tail) / (1 - tail), 0, 1) # additional chance of anti-Hale flip to meet target fraction
         flip = (rng.uniform(size=nnew) < p_extra) & (np.cos(orient) > 0)
         # broad tilts with a weak preference for 180° from Joy, flipped for leading end poleward
-        orient[flip] += np.pi + np.deg2rad(-2 * tilt_mean[flip] + 
-                                           rng.normal(size=flip.sum()) * 
-                                           self._ah_tilt_width)
+        orient[flip] += np.pi + np.deg2rad(rng.normal(size=flip.sum()) * self._ah_tilt_width) # + -2 * tilt_mean[flip]
         is_ah = np.cos(orient) < 0 # mask including both natural and forced anti-Hale flips
 
         # flip sign for opposite polarity regions in different hemispheres (Hale's Law)
