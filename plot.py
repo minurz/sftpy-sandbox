@@ -1,6 +1,6 @@
 import numpy as np
 
-from sftpy.viz import anim_map_with_flux, map_longavg
+from sftpy.viz import anim_map_with_flux, map_longavg, plot_aflux
 
 if __name__ == "__main__":
     # fname = "maps.npy"
@@ -14,7 +14,9 @@ if __name__ == "__main__":
 
     dt = 86400 * 1 * 16
 
-    map_longavg(data, dt)
+    plot_aflux(data, dt, show=True)
+
+    map_longavg(data, dt, flux_thresh=10)
 
     anim_map_with_flux(data, dt, show=True, ms=100, format="mkv")
 

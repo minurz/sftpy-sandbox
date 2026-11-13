@@ -40,6 +40,9 @@ BP_LAT_FLUX_FOLD: float = 500.0
 # Joy's Law Slope (deg)
 BP_JOY_SLOPE: float = 0.24
 
+# constant factor added to latitude spread (deg)
+BP_LAT_CONST: float = 3.75
+
 # mean equatorward tilt (deg)
 # BP_TILT_MEAN: float = 4.2
 
@@ -54,6 +57,3 @@ BP_TILT_FLUX_FOLD: float = 80.0
 
 # constant factor added to joy tilt spread (deg)
 BP_TILT_CONST: float = 18.0
-
-# flag turning off (0) or on (1) adding Poisson noise to fluxes
-BP_FLAG_NOISE: bool = True
