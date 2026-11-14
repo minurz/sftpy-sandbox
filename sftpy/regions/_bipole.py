@@ -10,7 +10,6 @@ from .constants import AR_BFIELD, BP_AH_TILT_WIDTH, BP_FLUX_POWER_ACT, BP_FLUX_P
 from .constants import ASYM_FLUX_FOLD, ASYM_SCATTER, AH_ASYM_DAMPING
 from .constants import BP_FRACTION_ANTI_HALE, ASYM_RATIO
 from .constants import BP_JOY_SLOPE, BP_TILT_WIDTH, BP_TILT_FLUX_FOLD, BP_TILT_CONST
-from .constants import BP_FLAG_NOISE
 from .constants import BP_LAT_WIDTH, BP_LAT_FLUX_FOLD, BP_LAT_CONST
 from .constants import BP_TILT_WIDTH, BP_TILT_FLUX_FOLD, BP_TILT_CONST
 from .constants import BP_FLUX_MIN, BP_FLUX_MAX, BP_FRACTION_TURBULENT
@@ -42,7 +41,6 @@ class SchrijverBipole(MagneticRegion):
                  asym_scatter: float = ASYM_SCATTER,
                  asym_flux_fold: float = ASYM_FLUX_FOLD,
                  ah_asym_damping: float = AH_ASYM_DAMPING,
-                 flag_noise: bool = BP_FLAG_NOISE,
                  lat_const: float = BP_LAT_CONST):
 
         super().__init__(time, data, activity)
@@ -70,8 +68,6 @@ class SchrijverBipole(MagneticRegion):
 
         self._asym_flux_fold = asym_flux_fold
         self._ah_asym_damping = ah_asym_damping
-
-        self._flag_noise = flag_noise
 
         if isinstance(activity, ScheduledActivity):
             strength_func = activity.strength_schedule
@@ -333,13 +329,12 @@ class SchrijverEphemeral(SchrijverBipole):
                  asym_scatter: float = ASYM_SCATTER,
                  asym_flux_fold: float = ASYM_FLUX_FOLD,
                  ah_asym_damping: float = AH_ASYM_DAMPING,
-                 flag_noise: bool = BP_FLAG_NOISE,
                  lat_const: float = BP_LAT_CONST):
 
         super().__init__(time, data, activity, pwr, flux_min, flux_max, ar_bfield,
                          lat_width, lat_flux_fold, joy_slope, tilt_width,
                          tilt_flux_fold, tilt_const, f_ah, ah_tilt_width, asym_ratio, 
-                         asym_scatter, asym_flux_fold, ah_asym_damping, lat_const, flag_noise)
+                         asym_scatter, asym_flux_fold, ah_asym_damping, lat_const)
 
         self._fraction_trb = fraction_trb
 
