@@ -2,7 +2,7 @@ import glob, re
 import numpy as np
 import matplotlib.pyplot as plt
 
-MAP_DIR = "./runs/nov06run02"   # SaveMap output folder
+MAP_DIR = "./runs/nov08run01/"   # SaveMap output folder
 DT_DAYS = 1.0                   # simulation timestep (days)
 CLIM = 6                        # colour limit (1e18 Mx per pixel)
 
