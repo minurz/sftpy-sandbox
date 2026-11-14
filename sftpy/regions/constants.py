@@ -10,7 +10,7 @@ ASYM_RATIO: float = 0.8 # 0.8
 # degree of randomness in asymmetry ratio, σ of ln(r_lead / r_follow), intrinsic (Yamamoto 2012)
 ASYM_SCATTER: float = 0.12 # 0.12
 
-# Flux scale at which asymmetry becomes significant (1e18 Mx per polarity or 2e20 Mx total unsigned)
+# Flux scale at which asymmetry becomes significant (1e20 Mx per polarity or 2e20 Mx total unsigned)
 ASYM_FLUX_FOLD: float = 100
 
 # damping factor for anti-Hale flips, 0.0–1.0, where 1.0 is no damping and 0.0 is complete damping

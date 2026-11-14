@@ -11,7 +11,6 @@ from .constants import ASYM_FLUX_FOLD, ASYM_SCATTER, AH_ASYM_DAMPING
 from .constants import BP_FRACTION_ANTI_HALE, ASYM_RATIO
 from .constants import BP_JOY_SLOPE, BP_TILT_WIDTH, BP_TILT_FLUX_FOLD, BP_TILT_CONST
 from .constants import BP_LAT_WIDTH, BP_LAT_FLUX_FOLD, BP_LAT_CONST
-from .constants import BP_TILT_WIDTH, BP_TILT_FLUX_FOLD, BP_TILT_CONST
 from .constants import BP_FLUX_MIN, BP_FLUX_MAX, BP_FRACTION_TURBULENT
 from ._magneticregion import MagneticRegion
 
@@ -156,7 +155,7 @@ class SchrijverBipole(MagneticRegion):
         
         lat_abs = np.degrees(np.abs(np.pi / 2 - theta))
         tilt_mean = self._joy_slope * lat_abs  # self._joy_amp * np.sin(np.radians(lat_abs)) for true nonlinear relationship, 4.2 for original IDL behavior
-        orient = (rng.normal(size=nnew) * width + self._tilt_mean) * np.pi / 180
+        orient = (rng.normal(size=nnew) * width + tilt_mean) * np.pi / 180
 
         # NEW: flip polarity of some regions to meet anti-Hale fraction target
         tail = ndtr((tilt_mean - 90) / width) + ndtr((-90 - tilt_mean) / width) # chance of being anti-Hale from Gaussian scatter
@@ -195,10 +194,13 @@ class SchrijverBipole(MagneticRegion):
 
         nadd = bulk + (rest > 0)
         nadd_tot = np.sum(nadd)
+        ind_rest = np.cumsum(nadd)[rest > 0] - 1
 
         r_nadd = np.repeat(r, nadd)
         sep_nadd = np.repeat(sep, nadd)
         percon_nadd = np.repeat(percon, nadd)
+        
+        percon_nadd[ind_rest] = rest[rest > 0]
 
         # flux of concentrations in each pole
         flux1 = +percon_nadd
