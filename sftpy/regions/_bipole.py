@@ -199,7 +199,6 @@ class SchrijverBipole(MagneticRegion):
         r_nadd = np.repeat(r, nadd)
         sep_nadd = np.repeat(sep, nadd)
         percon_nadd = np.repeat(percon, nadd)
-        
         percon_nadd[ind_rest] = rest[rest > 0]
 
         # flux of concentrations in each pole
