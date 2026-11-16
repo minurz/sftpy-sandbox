@@ -64,6 +64,7 @@ def collide_grid3d(phi: npt.NDArray[np.float64],
         for dx in range(-1, 2): # search through x, y surrounding cells of i
             for dy in range(-1, 2):
                 base = ((ix[i] + dx) * ncell + (iy[i] + dy)) * ncell + iz[i] # key for center cell z
+                # TODO: add column lookup table to reduce searchsorted candidates
                 a = np.searchsorted(skey, base - 1) # cell z - 1 of base, lowbound insert
                 b = a + np.searchsorted(skey[a:], base + 2) # cell z + 1 of base, highbound insert [a, b)
                 for m in range(a, b): # checks every single spot from z-1 to z+1
