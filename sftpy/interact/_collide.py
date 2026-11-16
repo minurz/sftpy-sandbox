@@ -44,7 +44,7 @@ def collide_grid3d(phi: npt.NDArray[np.float64],
         yi = st * np.sin(phi[i])
         zi = np.cos(theta[i])
         x[i] = xi; y[i] = yi; z[i] = zi
-        ai = int((xi + 1.0) / crphi) + 1   # integer cell coordinates, offset by 1 so ix-1 >= 0 and ix+1 < ncell
+        ai = int((xi + 1.0) / crphi) + 1        # integer cell coordinates, offset by 1 so ix-1 >= 0 and ix+1 < ncell
         bi = int((yi + 1.0) / crphi) + 1
         ci = int((zi + 1.0) / crphi) + 1
         ix[i] = ai; iy[i] = bi; iz[i] = ci
