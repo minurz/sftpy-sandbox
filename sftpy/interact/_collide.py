@@ -17,6 +17,79 @@ from .constants import NSKIP, COL_RADIUS
 
 TWO_PI = 2 * np.pi
 
+@nb.njit(cache=True)
+def collide_grid3d(phi: npt.NDArray[np.float64],
+             theta: npt.NDArray[np.float64],
+             flux: npt.NDArray[np.int64],
+             nflux: int,
+             crphi: float,
+             order: npt.NDArray[np.int64],
+             rvs: npt.NDArray[np.float64]):
+    """
+    Constructs a 3D grid of cells in Cartesian coordinates by modeling (-1,1) sphere as a cube.
+    Each cell is a cube of side length crphi, and the number of cells along each axis is ncell = ceil(2/crphi) + 3.
+    Check only cells adjacent to i for collision.
+    """
+
+    st = np.sin(theta[:nflux])
+    x = st * np.cos(phi[:nflux])
+    y = st * np.sin(phi[:nflux])
+    z = np.cos(theta[:nflux])
+
+    # integer cell coordinates, offset by 1 so ix-1 >= 0 and ix+1 < ncell
+    h = crphi
+    ncell = int(np.ceil(2.0 / h)) + 3
+    ix: npt.NDArray[np.int64] = ((x + 1.0) / h).astype(np.int64) + 1
+    iy: npt.NDArray[np.int64] = ((y + 1.0) / h).astype(np.int64) + 1
+    iz: npt.NDArray[np.int64] = ((z + 1.0) / h).astype(np.int64) + 1
+    key: npt.NDArray[np.int64] = (ix * ncell + iy) * ncell + iz # key 3D cell coordinates into a single integer xN**2 + yN + z
+
+    srt = np.argsort(key)
+    skey = key[srt]
+
+    crit2 = crphi * crphi
+    buf = np.empty(nflux, dtype=np.int64)
+
+    for i in order[:nflux]:
+        if flux[i] == 0:
+            continue
+
+        k = 0
+        for dx in range(-1, 2): # search through x, y surrounding cells of i
+            for dy in range(-1, 2):
+                base = ((ix[i] + dx) * ncell + (iy[i] + dy)) * ncell + iz[i] # key for center cell z
+                a = np.searchsorted(skey, base - 1, side='left') # cell z - 1 of base, lowbound insert
+                b = a + np.searchsorted(skey[a:], base + 1, side='right') # cell z + 1 of base, highbound insert [a, b)
+                for m in range(a, b): # checks every single spot from z-1 to z+1
+                    j = srt[m] # maps a sorted position back to the spot’s original index
+                    if flux[j] == 0:
+                        continue
+                    ddx = x[i] - x[j]
+                    ddy = y[i] - y[j]
+                    ddz = z[i] - z[j]
+                    if ddx * ddx + ddy * ddy + ddz * ddz < crit2:
+                        buf[k] = j
+                        k += 1
+
+        # buf includes i itself (distance 0)
+        if k > 1: # identical to collide2 pretty much
+            # sort so the pick doesn't depend on cell traversal order (reproducible)
+            nbrs = np.sort(buf[:k])
+            c = nbrs[min(int(rvs[i]*k), k-1)]
+            
+            s = np.sum(flux[buf[:k]])
+            flux[buf[:k]] = 0
+            flux[c] = s
+
+    index = np.nonzero(flux[:nflux])[0]
+    nnew = len(index)
+    
+    phi[:nnew] = phi[:nflux][index]
+    theta[:nnew] = theta[:nflux][index]
+    flux[:nnew] = flux[:nflux][index]
+    
+    return nnew
+
 @nb.jit(cache=True)
 def collide2(phi: npt.NDArray[np.float64],
              theta: npt.NDArray[np.float64],
@@ -264,7 +337,8 @@ class SchrijverCollide(Actor, Component):
         order = rng.permutation(np.arange(nflux, dtype=np.int64))
         rvs = rng.uniform(size=nflux)
 
-        nnew = collide2(phi_in, theta_in, flux_in, nflux, nskip, crphi, order, rvs)
+        nnew = collide_grid3d(phi_in, theta_in, flux_in, nflux, crphi, order, rvs)
+        # nnew = collide2(phi_in, theta_in, flux_in, nflux, nskip, crphi, order, rvs)
 
         data.clear(n=nnew)
         # data.append_sources(phi_out, theta_out, flux_out, nnew)
