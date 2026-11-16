@@ -31,24 +31,24 @@ def collide_grid3d(phi: npt.NDArray[np.float64],
     Check only cells adjacent to i for collision.
     """
 
-    n = nflux
-    x = np.empty(n); y = np.empty(n); z = np.empty(n)
-    ix: npt.NDArray[np.int64] = np.empty(n, np.int64); iy: npt.NDArray[np.int64] = np.empty(n, np.int64); iz: npt.NDArray[np.int64] = np.empty(n, np.int64)
-    key: npt.NDArray[np.int64] = np.empty(n, np.int64)
-    h = crphi
-    ncell = int(np.ceil(2.0 / h)) + 3
+    x: npt.NDArray[np.float64] = np.empty(nflux); y: npt.NDArray[np.float64] = np.empty(nflux); z: npt.NDArray[np.float64] = np.empty(nflux)
+    ix: npt.NDArray[np.int64] = np.empty(nflux, np.int64)
+    iy: npt.NDArray[np.int64] = np.empty(nflux, np.int64)
+    iz: npt.NDArray[np.int64] = np.empty(nflux, np.int64)
+    key: npt.NDArray[np.int64] = np.empty(nflux, np.int64)
+    ncell = int(np.ceil(2.0 / crphi)) + 3
 
-    for i in range(n):
+    for i in range(nflux):
         st = np.sin(theta[i])
         xi = st * np.cos(phi[i])
         yi = st * np.sin(phi[i])
         zi = np.cos(theta[i])
         x[i] = xi; y[i] = yi; z[i] = zi
-        a = int((xi + 1.0) / h) + 1   # integer cell coordinates, offset by 1 so ix-1 >= 0 and ix+1 < ncell
-        b = int((yi + 1.0) / h) + 1
-        c = int((zi + 1.0) / h) + 1
-        ix[i] = a; iy[i] = b; iz[i] = c
-        key[i] = (a * ncell + b) * ncell + c # key 3D cell coordinates into a single integer xN**2 + yN + z
+        ai = int((xi + 1.0) / crphi) + 1   # integer cell coordinates, offset by 1 so ix-1 >= 0 and ix+1 < ncell
+        bi = int((yi + 1.0) / crphi) + 1
+        ci = int((zi + 1.0) / crphi) + 1
+        ix[i] = ai; iy[i] = bi; iz[i] = ci
+        key[i] = (ai * ncell + bi) * ncell + ci # key 3D cell coordinates into a single integer xN**2 + yN + z
 
     srt = np.argsort(key)
     skey = key[srt]
