@@ -31,18 +31,24 @@ def collide_grid3d(phi: npt.NDArray[np.float64],
     Check only cells adjacent to i for collision.
     """
 
-    st = np.sin(theta[:nflux])
-    x = st * np.cos(phi[:nflux])
-    y = st * np.sin(phi[:nflux])
-    z = np.cos(theta[:nflux])
-
-    # integer cell coordinates, offset by 1 so ix-1 >= 0 and ix+1 < ncell
+    n = nflux
+    x = np.empty(n); y = np.empty(n); z = np.empty(n)
+    ix: npt.NDArray[np.int64] = np.empty(n, np.int64); iy: npt.NDArray[np.int64] = np.empty(n, np.int64); iz: npt.NDArray[np.int64] = np.empty(n, np.int64)
+    key: npt.NDArray[np.int64] = np.empty(n, np.int64)
     h = crphi
     ncell = int(np.ceil(2.0 / h)) + 3
-    ix: npt.NDArray[np.int64] = ((x + 1.0) / h).astype(np.int64) + 1
-    iy: npt.NDArray[np.int64] = ((y + 1.0) / h).astype(np.int64) + 1
-    iz: npt.NDArray[np.int64] = ((z + 1.0) / h).astype(np.int64) + 1
-    key: npt.NDArray[np.int64] = (ix * ncell + iy) * ncell + iz # key 3D cell coordinates into a single integer xN**2 + yN + z
+
+    for i in range(n):
+        st = np.sin(theta[i])
+        xi = st * np.cos(phi[i])
+        yi = st * np.sin(phi[i])
+        zi = np.cos(theta[i])
+        x[i] = xi; y[i] = yi; z[i] = zi
+        a = int((xi + 1.0) / h) + 1   # integer cell coordinates, offset by 1 so ix-1 >= 0 and ix+1 < ncell
+        b = int((yi + 1.0) / h) + 1
+        c = int((zi + 1.0) / h) + 1
+        ix[i] = a; iy[i] = b; iz[i] = c
+        key[i] = (a * ncell + b) * ncell + c # key 3D cell coordinates into a single integer xN**2 + yN + z
 
     srt = np.argsort(key)
     skey = key[srt]
@@ -74,19 +80,21 @@ def collide_grid3d(phi: npt.NDArray[np.float64],
         # buf includes i itself (distance 0)
         if k > 1: # identical to collide2 pretty much
             # sort so the pick doesn't depend on cell traversal order (reproducible)
-            nbrs = np.sort(buf[:k])
-            c = nbrs[min(int(rvs[i]*k), k-1)]
+            buf[:k].sort()
+            c = buf[min(int(rvs[i]*k), k - 1)]
             
-            s = np.sum(flux[buf[:k]])
-            flux[buf[:k]] = 0
+            s = 0
+            for l in range(k):
+                j = buf[l]
+                s += flux[j]
+                flux[j] = 0
             flux[c] = s
-
-    index = np.nonzero(flux[:nflux])[0]
-    nnew = len(index)
     
-    phi[:nnew] = phi[:nflux][index]
-    theta[:nnew] = theta[:nflux][index]
-    flux[:nnew] = flux[:nflux][index]
+    nnew = 0
+    for index in range(nflux):
+        if flux[index] != 0:
+            phi[nnew] = phi[index]; theta[nnew] = theta[index]; flux[nnew] = flux[index]
+            nnew += 1
     
     return nnew
 
