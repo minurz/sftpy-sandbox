@@ -1,6 +1,9 @@
 from matplotlib import animation as anim
 from matplotlib import pyplot as plt
 import numpy as np
+from scipy.ndimage import map_coordinates
+
+from sftpy.viz import disk
 
 from ..imgproc.constants import NPHI, NTHETA
 
@@ -195,6 +198,101 @@ def anim_syn(synoptic_all: np.ndarray,
                              interval=ms, blit=True)
 
     ani.save(filename="maps.gif", writer="pillow")
+
+    if show:
+        plt.show()
+
+def anim_map_with_flux_circ(maps: np.ndarray,
+                       dt: float,
+                       nphi: int=NPHI,
+                       ntheta: int=NTHETA,
+                       flux_thresh: int=FLUX_THRESHOLD,
+                       ms: int=ms,
+                       fpath: str=".",
+                       format: str="gif",
+                       show: bool=False):
+    figa, (axmap, axflux) = plt.subplots(nrows=2, ncols=1, figsize=(6, 7), dpi=150)
+
+    axis = np.linspace(-1, 1, nphi)
+
+    ### X is horizontal, Y is vertical, Z is line-of-sight
+    X, Y = np.meshgrid(axis, axis)
+    R2 = X*X + Y*Y
+    visible = X*X + Y*Y <= 1
+
+    Z = np.sqrt(np.clip(1 - R2, 0, None)) # line-of-sight
+    
+    phi0 = 0 # star long offset
+    phi = phi0 + np.arctan2(X, Z) # TODO: rotate about the X axis for theta tilt, % (2 * np.pi)
+    coords = np.array([phi / (2*np.pi) * nphi - 0.5,
+                       np.clip((Y + 1) / 2 * ntheta - 0.5, 0, ntheta - 1)])
+
+    def _cart_proj(frame):
+        disk = map_coordinates(frame, coords, order=1, mode="grid-wrap")
+        disk[~visible] = np.nan
+        return disk
+
+    # Carrington Map plot
+    # maps = np.transpose(maps, axes=(0, 2, 1))
+
+    # print(polar_maps.shape[0])
+
+    im = axmap.imshow(_cart_proj(maps[0]), cmap="gray",
+                      vmin=-flux_thresh, vmax=flux_thresh, origin="lower")
+    axmap.set_title("Star Map (Orthographic Projection)")
+    axmap.set_xticks([0, nphi // 2, nphi - 1],
+                     labels=["0", r"$\pi/2$", r"$\pi$"])
+    axmap.set_xlabel(r"Azimuth $\phi$")
+    axmap.set_yticks([nphi - 1, nphi // 2, 0],
+                     labels=[r"$\pi$", r"$\pi/2$", "0"])
+    axmap.set_ylabel(r"Colatitude $\theta$")
+    cb = plt.colorbar(im, shrink=0.7, cmap="gray", label=r"Flux ($10^{18}$ Mx)")
+
+    # Absolute ("Net") Flux plot
+    aflux = np.sum(np.abs(maps), axis=(1, 2))
+    nframes = maps.shape[0]
+    time = np.arange(nframes) * dt / 86400 / 365.25
+
+    axflux.plot(time, aflux)
+    axflux.set_xlabel("Time (yr)")
+    axflux.set_xlim(0, time[-1])
+    axflux.set_ylabel("Flux ($10^{18}$ Mx)")
+    axflux.set_ylim(0, None)
+    axflux.set_title("Total Absolute Flux")
+
+    # correction to text location
+    corr = 0.1 * (time - time[-1] / 2) / time[-1]
+    flux_max = axflux.get_ylim()[1]
+
+    point_flux = axflux.scatter(time[0], aflux[0], c="C1", s=25)
+    line_flux = axflux.plot(time[0], aflux[0], c="C1")[0]
+    text_flux = axflux.text(time[0]/time[-1], aflux[0]/flux_max - 0.05, f" {time[0]:.01f} yr ",
+                            ha="center", va="top",
+                            transform=axflux.transAxes)
+
+    figa.tight_layout()
+
+    def _update_map(t):
+        im.set_data(_cart_proj(maps[t])) # TODO: phi0 += some_rotation_rate
+
+        t_flux = time[t]
+        point_flux.set_offsets([[t_flux, aflux[t]]])
+        line_flux.set_data(time[:t], aflux[:t])
+
+        text_flux.set_position([t_flux/time[-1] - corr[t], aflux[t]/flux_max - 0.05])
+        text_flux.set_text(f" {t_flux:.01f} yr ")
+        return im, line_flux, text_flux, point_flux
+
+    ani = anim.FuncAnimation(fig=figa, func=_update_map, frames=nframes,
+                             interval=ms, blit=True)
+
+    fname = f"{fpath}/polar_maps_flux.{format}"
+    if format == "gif":
+        ani.save(filename=fname, writer="pillow")
+    elif format == "mp4":
+        ani.save(filename=fname, writer="ffmpeg")
+    elif format == "mkv":
+        ani.save(filename=fname, writer="ffmpeg")
 
     if show:
         plt.show()
